@@ -902,15 +902,17 @@ def setup_profile_inheritance(
 
 def sync_conversation_history(target_profile_dir: Path, source: str = "host") -> dict:
     """
-    Safely fork/copy conversation history, summaries, and brain directory
-    from host environment or another profile to the target profile.
+    Safely fork/copy conversation history, summaries, brain directory, and project
+    definitions from host environment or another profile to the target profile.
     Uses deep copy (never symlinks) to prevent SQLite concurrency locking.
     """
     profiles_dir = get_profiles_dir()
     if source == "host":
         src_gemini_ag = Path.home() / ".gemini" / "antigravity"
+        src_gemini_cfg = Path.home() / ".gemini" / "config"
     else:
         src_gemini_ag = profiles_dir / source / "home" / ".gemini" / "antigravity"
+        src_gemini_cfg = profiles_dir / source / "home" / ".gemini" / "config"
 
     if not src_gemini_ag.is_dir():
         return {"synced": False, "reason": f"Source directory not found: {src_gemini_ag}"}
@@ -919,31 +921,88 @@ def sync_conversation_history(target_profile_dir: Path, source: str = "host") ->
     dst_gemini_ag.mkdir(parents=True, exist_ok=True)
 
     copied = []
-    # 1. Copy conversation_summaries.db
+    # 1. Sync conversation_summaries.db using online SQLite backup (handles WAL & locks cleanly)
     src_db = src_gemini_ag / "conversation_summaries.db"
     dst_db = dst_gemini_ag / "conversation_summaries.db"
     if src_db.is_file():
         try:
-            shutil.copy2(src_db, dst_db)
+            import sqlite3
+            preserved_rows = []
+            if dst_db.is_file():
+                try:
+                    with sqlite3.connect(dst_db) as conn_dst:
+                        cur = conn_dst.cursor()
+                        cur.execute("SELECT * FROM conversation_summaries")
+                        rows = cur.fetchall()
+                        with sqlite3.connect(src_db) as conn_src:
+                            cur_src = conn_src.cursor()
+                            src_ids = set(r[0] for r in cur_src.execute("SELECT conversation_id FROM conversation_summaries").fetchall())
+                            preserved_rows = [r for r in rows if r[0] not in src_ids]
+                except Exception:
+                    preserved_rows = []
+
+            # Clean stale wal/shm on destination before backup
+            for ext in ("-wal", "-shm"):
+                stale_file = dst_gemini_ag / f"conversation_summaries.db{ext}"
+                try:
+                    stale_file.unlink(missing_ok=True)
+                except Exception:
+                    pass
+
+            with sqlite3.connect(src_db) as src_conn:
+                with sqlite3.connect(dst_db) as dst_conn:
+                    src_conn.backup(dst_conn)
+
+            if preserved_rows:
+                try:
+                    with sqlite3.connect(dst_db) as conn_dst:
+                        cur = conn_dst.cursor()
+                        placeholders = ",".join("?" * len(preserved_rows[0]))
+                        cur.executemany(f"INSERT OR REPLACE INTO conversation_summaries VALUES ({placeholders})", preserved_rows)
+                        conn_dst.commit()
+                except Exception:
+                    pass
+
             copied.append("conversation_summaries.db")
         except Exception:
             pass
 
-    # 2. Copy conversations/ folder
+    # 2. Copy agyhub_summaries_proto.pb (Project-tree UI summary index)
+    src_hub = src_gemini_ag / "agyhub_summaries_proto.pb"
+    dst_hub = dst_gemini_ag / "agyhub_summaries_proto.pb"
+    if src_hub.is_file():
+        try:
+            shutil.copy2(src_hub, dst_hub)
+            copied.append("agyhub_summaries_proto.pb")
+        except Exception:
+            pass
+
+    # 3. Copy antigravity_state.pbtxt (migration metadata)
+    src_state = src_gemini_ag / "antigravity_state.pbtxt"
+    dst_state = dst_gemini_ag / "antigravity_state.pbtxt"
+    if src_state.is_file() and not dst_state.is_file():
+        try:
+            shutil.copy2(src_state, dst_state)
+            copied.append("antigravity_state.pbtxt")
+        except Exception:
+            pass
+
+    # 4. Copy conversations/ folder (all .pb, .db, and session data)
     src_convs = src_gemini_ag / "conversations"
     dst_convs = dst_gemini_ag / "conversations"
     if src_convs.is_dir():
         dst_convs.mkdir(exist_ok=True)
         count = 0
-        for f in src_convs.glob("*.db"):
-            try:
-                shutil.copy2(f, dst_convs / f.name)
-                count += 1
-            except Exception:
-                pass
-        copied.append(f"conversations ({count} sessions)")
+        for f in src_convs.iterdir():
+            if f.is_file() and not f.name.endswith(".lock"):
+                try:
+                    shutil.copy2(f, dst_convs / f.name)
+                    count += 1
+                except Exception:
+                    pass
+        copied.append(f"conversations ({count} files)")
 
-    # 3. Copy brain/ folder (contains transcripts & artifacts)
+    # 5. Copy brain/ folder (contains transcripts & artifacts)
     src_brain = src_gemini_ag / "brain"
     dst_brain = dst_gemini_ag / "brain"
     if src_brain.is_dir():
@@ -955,11 +1014,8 @@ def sync_conversation_history(target_profile_dir: Path, source: str = "host") ->
         except Exception:
             pass
 
-    # 4. Copy config/projects/*.json (Project workspace structure & tree)
-    if source == "host":
-        src_projects = Path.home() / ".gemini" / "config" / "projects"
-    else:
-        src_projects = profiles_dir / source / "home" / ".gemini" / "config" / "projects"
+    # 6. Copy config/projects/*.json (Project workspace structure & tree)
+    src_projects = src_gemini_cfg / "projects"
     dst_projects = target_profile_dir / "home" / ".gemini" / "config" / "projects"
     if src_projects.is_dir():
         dst_projects.mkdir(parents=True, exist_ok=True)
@@ -1391,6 +1447,11 @@ def cmd_launch(args):
     harden_profile_perms(profile_dir, profiles_dir)
 
     env = os.environ.copy()
+    # Strip any host runtime environment variables so the new profile instance is 100% clean and isolated
+    for k in list(env.keys()):
+        if k.startswith("ANTIGRAVITY_") or k.startswith("ELECTRON_") or k.startswith("VSCODE_"):
+            del env[k]
+
     env["HOME"] = str(home_dir.resolve())
     if IS_WINDOWS:
         env["USERPROFILE"] = str(home_dir.resolve())
