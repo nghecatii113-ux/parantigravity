@@ -1182,6 +1182,29 @@ def cmd_create(args):
         print()
         cmd_launch(args)
 
+def cmd_sync(args):
+    """Sync/copy conversation history from host to an existing profile."""
+    profiles_dir = get_profiles_dir()
+    name = args.name.strip()
+    profile_dir = profiles_dir / name
+    if not profile_dir.is_dir():
+        print(f"{COLOR_RED}Error: Profile '{name}' does not exist at {profile_dir}{COLOR_RESET}", file=sys.stderr)
+        sys.exit(1)
+
+    pid = get_profile_process(profile_dir, profile_dir / "data")
+    if pid:
+        print(f"{COLOR_YELLOW}Warning: Profile '{name}' is currently running (PID: {pid}). Please stop it before syncing.{COLOR_RESET}")
+        return
+
+    source = getattr(args, "from_profile", None) or "host"
+    print(f"Syncing conversation history to '{name}' from {source}...")
+    res = sync_conversation_history(profile_dir, source=source)
+    if res.get("synced"):
+        items_str = ", ".join(res.get("items", []))
+        print(f"{COLOR_GREEN}✓ Successfully synced to '{name}': {items_str}{COLOR_RESET}")
+    else:
+        print(f"{COLOR_RED}Failed to sync: {res.get('reason')}{COLOR_RESET}")
+
 def profile_summary(profile_dir: Path, include_size: bool = False) -> dict:
     """Machine-readable summary of one profile (used by both `list --json`
     and the human table)."""
@@ -2122,6 +2145,12 @@ def main():
                                "(full links everything incl. ~/.ssh/.config; minimal skips "
                                "those dotdirs; none links nothing but the keychain bridge)")
     p_create.set_defaults(func=cmd_create)
+
+    # sync
+    p_sync = subparsers.add_parser("sync", help="Sync conversation history & brain from host to an existing profile")
+    p_sync.add_argument("name", help="Profile name to sync into")
+    p_sync.add_argument("--from-profile", metavar="SOURCE", help="Source profile to sync from (default: host)")
+    p_sync.set_defaults(func=cmd_sync)
 
     # list / ls
     p_list = subparsers.add_parser("list", aliases=["ls"], help="List all profiles and status")
