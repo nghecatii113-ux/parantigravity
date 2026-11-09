@@ -9,6 +9,18 @@ from __future__ import annotations
 import os
 import sys
 import json
+
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+if hasattr(sys.stderr, "reconfigure"):
+    try:
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 import time
 import mimetypes
 import webbrowser
@@ -44,11 +56,11 @@ _profiles_cache = {"t": 0.0, "body": b"[]"}
 PROFILES_CACHE_TTL = 1.0
 
 WIDGET_HTML = """<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ParaGravity 悬浮挂件 HUD</title>
+    <title>ParaGravity Floating Widget HUD</title>
     <style>
         :root {
             --bg: #0F172A;
@@ -168,18 +180,18 @@ WIDGET_HTML = """<!DOCTYPE html>
     <div class="header">
         <div class="title">
             <span>🐾 ParaGravity</span>
-            <span class="badge" id="running-count">0 活跃</span>
+            <span class="badge" id="running-count">0 Active</span>
         </div>
-        <a class="link" href="/" target="_blank">🖥️ 打开矩阵控制台</a>
+        <a class="link" href="/" target="_blank">🖥️ Open Web Console</a>
     </div>
 
     <div class="profile-list" id="profiles-container">
-        <div style="text-align:center;padding:20px;color:var(--text-muted);">正在加载分身...</div>
+        <div style="text-align:center;padding:20px;color:var(--text-muted);">Loading profiles...</div>
     </div>
 
     <div class="footer">
-        <span id="refresh-indicator">● 实时同步</span>
-        <span class="link" onclick="fetchProfiles()">刷新</span>
+        <span id="refresh-indicator">● Live Sync</span>
+        <span class="link" onclick="fetchProfiles()">Refresh</span>
     </div>
 
     <script>
@@ -199,10 +211,10 @@ WIDGET_HTML = """<!DOCTYPE html>
         function renderProfiles(profiles) {
             const container = document.getElementById('profiles-container');
             const runningCount = profiles.filter(p => p.running).length;
-            document.getElementById('running-count').textContent = `${runningCount} 活跃`;
+            document.getElementById('running-count').textContent = `${runningCount} Active`;
 
             if (profiles.length === 0) {
-                container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);">暂无分身，请在终端执行 pgrav create 创建</div>';
+                container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);">No profiles yet. Click "+ Create Profile" or run pgrav create &lt;name&gt;</div>';
                 return;
             }
 
@@ -214,12 +226,12 @@ WIDGET_HTML = """<!DOCTYPE html>
                             <span>${esc(p.name)}</span>
                             ${p.running ? `<span style="font-size:10px;color:#94A3B8;">(PID: ${esc(p.pid)})</span>` : ''}
                         </div>
-                        <div class="profile-account">${esc(p.account || '(未绑定 Google 账号)')}</div>
+                        <div class="profile-account">${esc(p.account || '(No Google account bound)')}</div>
                     </div>
                     <div>
                         ${p.running
-                            ? `<button class="btn btn-stop" onclick="stopProfile('${p.name}')">停止</button>`
-                            : `<button class="btn btn-launch" onclick="launchProfile('${p.name}')">启动</button>`
+                            ? `<button class="btn btn-stop" onclick="stopProfile('${p.name}')">Stop</button>`
+                            : `<button class="btn btn-launch" onclick="launchProfile('${p.name}')">Launch</button>`
                         }
                     </div>
                 </div>
@@ -236,6 +248,28 @@ WIDGET_HTML = """<!DOCTYPE html>
             setTimeout(fetchProfiles, 500);
         }
 
+        async function createProfilePrompt() {
+            const name = prompt("Enter new profile name (e.g. work, dev, personal):");
+            if (!name || !name.trim()) return;
+            const launch = confirm("Launch Antigravity window immediately after creation?");
+            try {
+                const res = await fetch('/api/profiles', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name.trim(), launch: launch })
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    alert(`Profile '${name.trim()}' created successfully!`);
+                    fetchProfiles();
+                } else {
+                    alert("Error: " + (data.error || "Failed to create profile"));
+                }
+            } catch (err) {
+                alert("Connection error: " + err);
+            }
+        }
+
         fetchProfiles();
         setInterval(fetchProfiles, 2500);
     </script>
@@ -244,11 +278,11 @@ WIDGET_HTML = """<!DOCTYPE html>
 """
 
 STANDALONE_CONSOLE_HTML = """<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ParaGravity 控制台</title>
+    <title>ParaGravity Web Console</title>
     <style>
         :root {
             --bg: #F8F9FD;
@@ -356,24 +390,24 @@ STANDALONE_CONSOLE_HTML = """<!DOCTYPE html>
     <header>
         <h1>🌌 ParaGravity Web Console</h1>
         <div>
-            <a class="btn btn-outline" href="/widget" target="_blank" style="text-decoration:none;">🐾 悬浮挂件 (Widget)</a>
+            <a class="btn btn-outline" href="/widget" target="_blank" style="text-decoration:none;">🐾 Floating Widget</a>
         </div>
     </header>
 
     <div class="banner">
-        <div>💡 <b>提示</b>：当前为纯标准库即开即用模式。在 <code>dashboard/</code> 目录执行 <code>npm run build</code> 可启用高级 React 多宫格矩阵。</div>
+        <div>💡 <b>Notice</b>: Running in zero-dependency standard library mode. Run <code>npm run build</code> inside <code>dashboard/</code> to enable advanced React Matrix grid.</div>
         <a class="btn btn-outline" style="font-size:11px;padding:4px 8px;text-decoration:none;" href="https://github.com/edison-land/paragravity" target="_blank">GitHub</a>
     </div>
 
     <div class="actions-bar">
-        <button class="btn" onclick="batchLaunch()">🚀 一键启动全部</button>
-        <button class="btn btn-outline" onclick="batchStop()">⏹ 一键停止全部</button>
-        <button class="btn btn-outline" onclick="tileWindows()">🪟 智能平铺窗口 (macOS)</button>
-        <button class="btn btn-outline" onclick="fetchProfiles()">🔄 刷新列表</button>
+        <button class="btn" style="background:#10B981;" onclick="createProfilePrompt()">➕ Create New Profile</button>
+        <button class="btn" onclick="batchLaunch()">🚀 Launch All</button>
+        <button class="btn btn-outline" onclick="batchStop()">⏹ Stop All</button>
+        <button class="btn btn-outline" onclick="fetchProfiles()">🔄 Refresh List</button>
     </div>
 
     <div class="grid" id="profile-grid">
-        <div style="color:var(--text-muted);grid-column:1/-1;">正在加载分身...</div>
+        <div style="color:var(--text-muted);grid-column:1/-1;">Loading profiles...</div>
     </div>
 
     <script>
@@ -393,7 +427,7 @@ STANDALONE_CONSOLE_HTML = """<!DOCTYPE html>
         function renderGrid(profiles) {
             const grid = document.getElementById('profile-grid');
             if (profiles.length === 0) {
-                grid.innerHTML = '<div style="color:var(--text-muted);grid-column:1/-1;">暂无分身，请在终端执行 pgrav create &lt;name&gt; 创建</div>';
+                grid.innerHTML = '<div style="color:var(--text-muted);grid-column:1/-1;">No profiles found. Click <b>➕ Create New Profile</b> above or run <code>pgrav create &lt;name&gt;</code> in terminal.</div>';
                 return;
             }
             grid.innerHTML = profiles.map(p => `
@@ -402,18 +436,18 @@ STANDALONE_CONSOLE_HTML = """<!DOCTYPE html>
                         <div class="card-header">
                             <span class="card-title">${esc(p.name)}</span>
                             <span class="status-badge ${p.running ? 'status-running' : 'status-stopped'}">
-                                ${p.running ? `● 运行中 (${esc(p.pid)})` : '○ 已停止'}
+                                ${p.running ? `● Running (${esc(p.pid)})` : '○ Stopped'}
                             </span>
                         </div>
-                        <div class="card-account" style="margin-top:8px;">${esc(p.account || '(未绑定 Google 账号)')}</div>
-                        <div class="card-account" style="margin-top:4px;font-size:11px;">目录: ${esc(p.directory || '-')}</div>
+                        <div class="card-account" style="margin-top:8px;">${esc(p.account || '(No Google account bound)')}</div>
+                        <div class="card-account" style="margin-top:4px;font-size:11px;">Directory: ${esc(p.directory || '-')}</div>
                     </div>
                     <div class="card-actions">
                         ${p.running
-                            ? `<button class="btn btn-outline" style="color:#EF4444;border-color:rgba(239,68,68,0.3);" onclick="stopProfile('${p.name}')">停止</button>`
-                            : `<button class="btn" onclick="launchProfile('${p.name}')">启动窗口</button>`
+                            ? `<button class="btn btn-outline" style="color:#EF4444;border-color:rgba(239,68,68,0.3);" onclick="stopProfile('${p.name}')">Stop</button>`
+                            : `<button class="btn" onclick="launchProfile('${p.name}')">Launch</button>`
                         }
-                        <button class="btn btn-outline" onclick="deleteProfile('${p.name}')">删除</button>
+                        <button class="btn btn-outline" onclick="deleteProfile('${p.name}')">Delete</button>
                     </div>
                 </div>
             `).join('');
@@ -430,7 +464,7 @@ STANDALONE_CONSOLE_HTML = """<!DOCTYPE html>
         }
 
         async function deleteProfile(name) {
-            if (!confirm(`确定要删除分身 '${name}' 吗？`)) return;
+            if (!confirm(`Are you sure you want to delete profile '${name}'?`)) return;
             await fetch(`/api/profiles/${encodeURIComponent(name)}`, { method: 'DELETE' });
             setTimeout(fetchProfiles, 600);
         }
@@ -449,6 +483,28 @@ STANDALONE_CONSOLE_HTML = """<!DOCTYPE html>
             const res = await fetch('/api/tile', { method: 'POST' });
             const data = await res.json();
             if (!data.success && data.error) alert(data.error);
+        }
+
+        async function createProfilePrompt() {
+            const name = prompt("Enter new profile name (e.g. work, dev, personal):");
+            if (!name || !name.trim()) return;
+            const launch = confirm("Launch Antigravity window immediately after creation?");
+            try {
+                const res = await fetch('/api/profiles', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name.trim(), launch: launch })
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    alert(`Profile '${name.trim()}' created successfully!`);
+                    fetchProfiles();
+                } else {
+                    alert("Error: " + (data.error || "Failed to create profile"));
+                }
+            } catch (err) {
+                alert("Connection error: " + err);
+            }
         }
 
         fetchProfiles();
@@ -498,7 +554,7 @@ class ParaGravityHandler(BaseHTTPRequestHandler):
             self.send_json({
                 "version": "1.2.0",
                 "theme": "dawn-iris",
-                "themeName": "晨曦紫霞白 (Dawn Iris & Violet)",
+                "themeName": "Dawn Iris & Violet",
                 "platform": sys.platform,
             })
             return
@@ -594,6 +650,8 @@ class ParaGravityHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+        except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
+            pass
         except Exception as e:
             self.send_json({"error": str(e)}, status=500)
 
@@ -605,12 +663,18 @@ class ParaGravityHandler(BaseHTTPRequestHandler):
             name = data.get("name", "").strip()
             desc = data.get("description", "")
             launch = data.get("launch", False)
+            inherit = data.get("inherit_config", True)
+            sync_convs = data.get("sync_conversations", False)
 
             if not name:
                 self.send_json({"error": "Profile name is required"}, status=400)
                 return
 
             cmd = [sys.executable, str(CLI_PATH), "create", name]
+            if inherit:
+                cmd.append("-i")
+            if sync_convs:
+                cmd.append("-c")
             if desc:
                 cmd.extend(["-d", desc])
             if launch:
@@ -812,12 +876,15 @@ class ParaGravityHandler(BaseHTTPRequestHandler):
             self.send_error(500, f"Error reading file: {e}")
 
     def send_json(self, data: dict, status: int = 200):
-        body = json.dumps(data).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+        try:
+            body = json.dumps(data).encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
+            pass
 
     def log_message(self, format, *args):
         # Clean terminal logging
@@ -833,10 +900,10 @@ def start_server(port: int = 3888, open_browser: bool = True, widget_mode: bool 
     base_url = f"http://127.0.0.1:{port}"
     target_url = f"{base_url}/widget" if widget_mode else base_url
 
-    print(f"\033[36m🌌 ParaGravity Web Console & Widget 已启动：\033[0m \033[1m{target_url}\033[0m")
-    print(f"  • 矩阵控制台: \033[1m{base_url}\033[0m")
-    print(f"  • 悬浮小挂件: \033[1m{base_url}/widget\033[0m")
-    print("  • 退出服务:   按 \033[1mCtrl + C\033[0m\n")
+    print(f"\033[36m🌌 ParaGravity Web Console & Widget started:\033[0m \033[1m{target_url}\033[0m")
+    print(f"  • Web Console:    \033[1m{base_url}\033[0m")
+    print(f"  • Floating Widget:\033[1m{base_url}/widget\033[0m")
+    print("  • Quit service:    Press \033[1mCtrl + C\033[0m\n")
 
     if open_browser:
         webbrowser.open(target_url)
@@ -844,7 +911,7 @@ def start_server(port: int = 3888, open_browser: bool = True, widget_mode: bool 
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
-        print("\n\033[33mWeb Console 已停止。\033[0m")
+        print("\n\033[33mWeb Console stopped.\033[0m")
         httpd.server_close()
 
 if __name__ == "__main__":

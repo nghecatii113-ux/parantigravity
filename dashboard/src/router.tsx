@@ -44,7 +44,7 @@ const INITIAL_DEMO_PROFILES: Profile[] = [
     has_token: true,
     token_exp: null,
     size: "24.5 MB",
-    description: "Quota 94% · 主开发环境",
+    description: "Quota 94% · Primary Dev Environment",
     created_at: new Date().toISOString(),
     path: "~/.antigravity-profiles/zwe",
   },
@@ -56,7 +56,7 @@ const INITIAL_DEMO_PROFILES: Profile[] = [
     has_token: true,
     token_exp: null,
     size: "18.2 MB",
-    description: "RAM 18.2 MB · /goal 自治研究员",
+    description: "RAM 18.2 MB · /goal Autonomous Researcher",
     created_at: new Date().toISOString(),
     path: "~/.antigravity-profiles/research",
   },
@@ -68,7 +68,7 @@ const INITIAL_DEMO_PROFILES: Profile[] = [
     has_token: true,
     token_exp: null,
     size: "22.4 MB",
-    description: "RAM 22.4 MB · 矩阵并发评测",
+    description: "RAM 22.4 MB · Matrix Benchmark",
     created_at: new Date().toISOString(),
     path: "~/.antigravity-profiles/evaluator",
   },
@@ -80,7 +80,7 @@ const INITIAL_DEMO_PROFILES: Profile[] = [
     has_token: false,
     token_exp: null,
     size: "15.1 MB",
-    description: "纯净隔离新沙盒",
+    description: "Clean Isolated Sandbox",
     created_at: new Date().toISOString(),
     path: "~/.antigravity-profiles/sandbox",
   },
@@ -108,7 +108,7 @@ const CHROMA_THEMES: ChromaTheme[] = [
     tagColor: "text-sky-700 bg-sky-50 border-sky-200",
     metricColor: "text-sky-600",
     badgeDot: "bg-sky-500",
-    label: "蔚蓝",
+    label: "Azure Blue",
   },
   {
     name: "coral",
@@ -119,7 +119,7 @@ const CHROMA_THEMES: ChromaTheme[] = [
     tagColor: "text-rose-700 bg-rose-50 border-rose-200",
     metricColor: "text-[#FF5232]",
     badgeDot: "bg-[#FF5232]",
-    label: "珊瑚红",
+    label: "Coral Red",
   },
   {
     name: "emerald",
@@ -130,7 +130,7 @@ const CHROMA_THEMES: ChromaTheme[] = [
     tagColor: "text-emerald-700 bg-emerald-50 border-emerald-200",
     metricColor: "text-emerald-600",
     badgeDot: "bg-emerald-500",
-    label: "翡翠绿",
+    label: "Emerald Green",
   },
   {
     name: "violet",
@@ -141,7 +141,7 @@ const CHROMA_THEMES: ChromaTheme[] = [
     tagColor: "text-purple-700 bg-purple-50 border-purple-200",
     metricColor: "text-purple-600",
     badgeDot: "bg-purple-500",
-    label: "紫罗兰",
+    label: "Violet",
   },
   {
     name: "amber",
@@ -152,7 +152,7 @@ const CHROMA_THEMES: ChromaTheme[] = [
     tagColor: "text-amber-700 bg-amber-50 border-amber-200",
     metricColor: "text-amber-600",
     badgeDot: "bg-amber-500",
-    label: "琥珀金",
+    label: "Amber Gold",
   },
 ]
 
@@ -215,7 +215,7 @@ function IslandDashboard() {
           const modes: LayoutMode[] = ["auto", "2-split", "3-split", "4-grid", "stack"]
           const nextIdx = (modes.indexOf(prev) + 1) % modes.length
           const next = modes[nextIdx]
-          showToast(`切换布局模式: ${next}`)
+          showToast(`Switch layout mode: ${next}`)
           return next
         })
       } else if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
@@ -241,36 +241,36 @@ function IslandDashboard() {
 
   const handleLaunch = async (name: string) => {
     if (isDemoMode) {
-      showToast(`[演示] 分身 '${name}' 实例已就绪`)
+      showToast(`[Demo] Profiles '${name}' Instances ready`)
       return
     }
     try {
       const res = await fetch(`/api/profiles/${encodeURIComponent(name)}/launch`, { method: "POST" })
       if (res.ok) {
-        showToast(`分身 '${name}' 启动成功！`)
+        showToast(`Profiles '${name}' LaunchSuccess!`)
         fetchProfiles()
       } else {
         const err = await res.json()
-        showToast(`启动失败: ${err.error || "未知错误"}`)
+        showToast(`Launchfailed: ${err.error || "Unknown error"}`)
       }
     } catch (err: any) {
-      showToast(`错误: ${err.message}`)
+      showToast(`Error: ${err.message}`)
     }
   }
 
   const handleStop = async (name: string) => {
     if (isDemoMode) {
-      showToast(`[演示] 分身 '${name}' 已停止`)
+      showToast(`[Demo] Profiles '${name}' Stopped`)
       return
     }
     try {
       const res = await fetch(`/api/profiles/${encodeURIComponent(name)}/stop`, { method: "POST" })
       if (res.ok) {
-        showToast(`分身 '${name}' 已停止运行`)
+        showToast(`Profiles '${name}' StoppedRun`)
         fetchProfiles()
       }
     } catch (err: any) {
-      showToast(`错误: ${err.message}`)
+      showToast(`Error: ${err.message}`)
     }
   }
 
@@ -282,27 +282,27 @@ function IslandDashboard() {
         : profilesToDisplay.map((p) => p.name)
 
     if (isDemoMode) {
-      showToast(`[演示] 已同时并行唤起 ${targets.length} 个实例！`)
+      showToast(`[Demo] Already simultaneouslyParallel launch ${targets.length} Instances！`)
       return
     }
 
     try {
       setIsBatchLaunching(true)
-      showToast(`正在同时并行唤起 ${targets.length} 个 Antigravity 窗口...`)
+      showToast(`Launching ${targets.length}  Antigravity windows in parallel...`)
       const res = await fetch("/api/batch/launch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ names: targets }),
       })
       if (res.ok) {
-        showToast(`🎉 成功并行启动 ${targets.length} 个环境！`)
+        showToast(`🎉 Successfully launched ${targets.length}  environments in parallel!`)
         fetchProfiles()
       } else {
         const err = await res.json()
-        showToast(`并行启动出现问题: ${err.error || "请重试"}`)
+        showToast(`Parallel Launch encountered an issue: ${err.error || "Please try again"}`)
       }
     } catch (err: any) {
-      showToast(`启动出错: ${err.message}`)
+      showToast(`LaunchError: ${err.message}`)
     } finally {
       setIsBatchLaunching(false)
     }
@@ -315,73 +315,73 @@ function IslandDashboard() {
       .map((p) => p.name)
 
     if (runningNames.length === 0) {
-      showToast("当前没有正在运行的实例")
+      showToast("Currently no RunInstances")
       return
     }
 
     if (isDemoMode) {
-      showToast("[演示] 所有运行中实例已全部休眠")
+      showToast("[Demo] All RunningInstancesAlready AllStop")
       return
     }
 
     try {
-      showToast(`正在批量休眠 ${runningNames.length} 个实例...`)
+      showToast(`Batch processing Stop ${runningNames.length} Instances...`)
       const res = await fetch("/api/batch/stop", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ names: runningNames }),
       })
       if (res.ok) {
-        showToast("已成功全部停止")
+        showToast("All instances stopped successfully")
         fetchProfiles()
       }
     } catch (err: any) {
-      showToast(`停止出错: ${err.message}`)
+      showToast(`StopError: ${err.message}`)
     }
   }
 
   // Tile Windows on macOS Display
   const handleTileWindows = async () => {
     if (isDemoMode) {
-      showToast("[演示] 已自动按四宫格/多列将窗口智能平铺到屏幕！")
+      showToast("[Demo] Already autoPress 2x2 Grid/tiled windows across multiple columns！")
       return
     }
 
     try {
-      showToast("正在自动检测窗口并在屏幕上智能平铺...")
+      showToast("Detecting windows and tiling on screen...")
       const res = await fetch("/api/tile", { method: "POST" })
       const data = await res.json()
       if (data.success) {
-        showToast("🪟 屏幕窗口平铺完成！")
+        showToast("🪟 Window tiling completed!")
       } else {
-        showToast(`平铺提示: ${data.error || data.message || "请检查辅助功能权限"}`)
+        showToast(`Tiling notice: ${data.error || data.message || "Please check accessibility permissions"}`)
       }
     } catch (err: any) {
-      showToast(`平铺失败: ${err.message}`)
+      showToast(`Tiling failed: ${err.message}`)
     }
   }
 
-  const handleCreate = async (name: string, description: string, launch: boolean) => {
+  const handleCreate = async (name: string, description: string, launch: boolean, syncConversations: boolean = true) => {
     if (isDemoMode) {
       setIsDemoMode(false)
     }
     const res = await fetch("/api/profiles", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, description, launch }),
+      body: JSON.stringify({ name, description, launch, sync_conversations: syncConversations }),
     })
     if (!res.ok) {
       const err = await res.json()
-      throw new Error(err.error || "创建失败")
+      throw new Error(err.error || "Failed to create")
     }
-    showToast(`分身 '${name}' 创建成功！`)
+    showToast(`Profiles '${name}' Created successfully!`)
     fetchProfiles()
   }
 
   const handleDelete = async (name: string) => {
     const res = await fetch(`/api/profiles/${encodeURIComponent(name)}`, { method: "DELETE" })
     if (res.ok) {
-      showToast(`分身 '${name}' 已完全删除`)
+      showToast(`Profiles '${name}' Deleted`)
       fetchProfiles()
     }
   }
@@ -391,7 +391,7 @@ function IslandDashboard() {
     navigator.clipboard.writeText(email)
     setCopiedName(email)
     setTimeout(() => setCopiedName(null), 1800)
-    showToast(`已复制: ${email}`)
+    showToast(`Copied: ${email}`)
   }
 
   // Calculate Grid Classes based on layout mode
@@ -470,10 +470,10 @@ function IslandDashboard() {
                 </span>
               </div>
               <div className="text-xs text-slate-400 font-medium flex items-center gap-2 mt-0.5">
-                <span>共 {profilesToDisplay.length} 个独立环境</span>
+                <span>Total:  {profilesToDisplay.length}  isolated environments</span>
                 <span>•</span>
                 <span className={runningCount > 0 ? "text-emerald-600 font-semibold" : "text-slate-400"}>
-                  {runningCount} 个正在运行
+                  {runningCount}  running
                 </span>
               </div>
             </div>
@@ -488,40 +488,40 @@ function IslandDashboard() {
                 className={`px-2.5 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1 transition-all ${
                   layoutMode === "auto" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-800"
                 }`}
-                title="自动自适应网格"
+                title="Auto Grid"
               >
                 <LayoutGrid className="w-3 h-3" />
-                <span>自适应</span>
+                <span>Auto</span>
               </button>
               <button
                 onClick={() => setLayoutMode("2-split")}
                 className={`px-2 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1 transition-all ${
                   layoutMode === "2-split" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-800"
                 }`}
-                title="双栏并排 (⌘D)"
+                title="Side by Side (⌘D)"
               >
                 <Columns2 className="w-3 h-3" />
-                <span>2栏</span>
+                <span>2 Cols</span>
               </button>
               <button
                 onClick={() => setLayoutMode("3-split")}
                 className={`px-2 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1 transition-all ${
                   layoutMode === "3-split" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-800"
                 }`}
-                title="三列全景"
+                title="3 Columns"
               >
                 <Rows3 className="w-3 h-3 rotate-90" />
-                <span>3列</span>
+                <span>3 cols</span>
               </button>
               <button
                 onClick={() => setLayoutMode("4-grid")}
                 className={`px-2 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1 transition-all ${
                   layoutMode === "4-grid" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-800"
                 }`}
-                title="四宫格矩阵"
+                title="2x2 Grid"
               >
                 <Grid2X2 className="w-3 h-3" />
-                <span>4格</span>
+                <span>4 Grid</span>
               </button>
             </div>
 
@@ -529,7 +529,7 @@ function IslandDashboard() {
             <button
               onClick={() => {
                 setIsDemoMode(!isDemoMode)
-                showToast(isDemoMode ? "已切换至本地真实环境" : "已开启多实例演示预览 (Auto-Demo)")
+                showToast(isDemoMode ? "Switched to local environment" : "Enabled multi-InstancesDemoPreview (Auto-Demo)")
               }}
               className={`px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
                 isDemoMode
@@ -538,14 +538,14 @@ function IslandDashboard() {
               }`}
             >
               <Clapperboard className="w-3.5 h-3.5 text-sky-600" />
-              <span>{isDemoMode ? "演示中" : "演示"}</span>
+              <span>{isDemoMode ? "Demo Mode" : "Demo"}</span>
             </button>
 
             {/* Sound Toggle */}
             <button
               onClick={() => setIsMuted(!isMuted)}
               className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200/80 border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-900 transition-colors"
-              title={isMuted ? "开启音效" : "静音"}
+              title={isMuted ? "Enable Sound" : "Mute"}
             >
               {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
             </button>
@@ -554,7 +554,7 @@ function IslandDashboard() {
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
               className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200/80 border border-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-900 transition-colors"
-              title={isCollapsed ? "展开" : "收起"}
+              title={isCollapsed ? "Expand" : "Collapse"}
             >
               {isCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
             </button>
@@ -615,7 +615,7 @@ function IslandDashboard() {
                                     </span>
                                   ) : (
                                     <span className="text-[11px] font-mono text-slate-400">
-                                      已休眠
+                                      Already Stop
                                     </span>
                                   )}
                                 </div>
@@ -624,10 +624,10 @@ function IslandDashboard() {
                                 <div
                                   onClick={(e) => profile.email && handleCopyEmail(profile.email, e)}
                                   className="text-xs font-mono text-slate-500 mt-1 flex items-center gap-1 hover:text-slate-800 transition-colors"
-                                  title="点击复制账号"
+                                  title="Click to copy account"
                                 >
                                   <span className="truncate max-w-[140px] sm:max-w-[180px]">
-                                    {profile.email || "未绑定 Google 账号"}
+                                    {profile.email || "No Google account bound"}
                                   </span>
                                   {profile.email && (
                                     copiedName === profile.email ? (
@@ -649,21 +649,21 @@ function IslandDashboard() {
                                 onChange={() => toggleSelectProfile(profile.name)}
                                 onClick={(e) => e.stopPropagation()}
                                 className="w-4 h-4 rounded text-sky-600 border-slate-300 focus:ring-sky-500 cursor-pointer"
-                                title="选中参与批量操作"
+                                title="Select for batch action"
                               />
 
                               {/* Running / Stopped Indicator */}
                               {isRunning ? (
-                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 neon-dot inline-block" title="运行中" />
+                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 neon-dot inline-block" title="Running" />
                               ) : (
-                                <span className="w-2.5 h-2.5 rounded-full bg-slate-300 inline-block" title="已休眠" />
+                                <span className="w-2.5 h-2.5 rounded-full bg-slate-300 inline-block" title="Already Stop" />
                               )}
                             </div>
                           </div>
 
                           {/* Description text */}
                           <div className="mt-3 text-xs text-slate-500 line-clamp-1 font-medium">
-                            {profile.description || "独立无干扰沙盒环境"}
+                            {profile.description || "Isolated sandbox environment"}
                           </div>
 
                           {/* Bottom Row: Metrics & Quick Action Icons */}
@@ -681,10 +681,10 @@ function IslandDashboard() {
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  showToast(`分身 '${profile.name}' 窗口已居中聚焦`)
+                                  showToast(`Profiles '${profile.name}' Window focused and centered`)
                                 }}
                                 className="p-1 hover:text-slate-700 transition-colors"
-                                title="聚焦此实例窗口"
+                                title="Focus this Instanceswindow"
                               >
                                 <Maximize2 className="w-3.5 h-3.5" />
                               </button>
@@ -697,7 +697,7 @@ function IslandDashboard() {
                                     handleStop(profile.name)
                                   }}
                                   className="p-1 text-rose-500 hover:text-rose-600 transition-colors"
-                                  title="停止实例"
+                                  title="StopInstances"
                                 >
                                   <Square className="w-3.5 h-3.5 fill-current" />
                                 </button>
@@ -708,7 +708,7 @@ function IslandDashboard() {
                                     handleLaunch(profile.name)
                                   }}
                                   className="p-1 text-emerald-600 hover:text-emerald-700 transition-colors"
-                                  title="单独启动"
+                                  title="Launch instance"
                                 >
                                   <Play className="w-3.5 h-3.5 fill-current" />
                                 </button>
@@ -722,7 +722,7 @@ function IslandDashboard() {
                                     setDeleteTarget(profile.name)
                                   }}
                                   className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
-                                  title="删除配置"
+                                  title="DeleteConfig"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
@@ -743,12 +743,12 @@ function IslandDashboard() {
                 <div className="flex items-center gap-3 flex-wrap">
                   <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-xs font-mono text-slate-700 font-medium">
                     <Zap className="w-3.5 h-3.5 text-amber-500" />
-                    <span>{runningCount} / {profilesToDisplay.length} 运行中</span>
+                    <span>{runningCount} / {profilesToDisplay.length} Running</span>
                   </div>
 
                   <span className="text-xs text-slate-400 font-medium">
-                    • 按 <kbd className="font-mono text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">⌘D</kbd> 切分屏
-                    • <kbd className="font-mono text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">⌘Enter</kbd> 一键全开
+                    • Press  <kbd className="font-mono text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">⌘D</kbd> Tile Windows
+                    • <kbd className="font-mono text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">⌘Enter</kbd> Launch All
                   </span>
                 </div>
 
@@ -758,10 +758,10 @@ function IslandDashboard() {
                   <button
                     onClick={handleTileWindows}
                     className="px-3 py-2 rounded-xl text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
-                    title="在屏幕上按四宫格/多列自动平铺摆放所有实例窗口"
+                    title="Automatically tile all instance windows on screen"
                   >
                     <AppWindow className="w-3.5 h-3.5 text-indigo-500" />
-                    <span>屏幕智能平铺</span>
+                    <span>Smart Window Tiling</span>
                   </button>
 
                   {/* Stop All Button */}
@@ -769,10 +769,10 @@ function IslandDashboard() {
                     <button
                       onClick={handleStopAll}
                       className="px-3 py-2 rounded-xl text-xs font-semibold bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
-                      title="休眠全部实例"
+                      title="Stop All Instances"
                     >
                       <Square className="w-3 h-3 fill-current" />
-                      <span>全部休眠</span>
+                      <span>AllStop</span>
                     </button>
                   )}
 
@@ -782,7 +782,7 @@ function IslandDashboard() {
                     className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5 text-sky-500" />
-                    <span>新建分身</span>
+                    <span>Create Profile</span>
                   </button>
 
                   {/* Main Glowing Button: Cyan-to-Coral Duotone Gradient */}
@@ -800,8 +800,8 @@ function IslandDashboard() {
                     )}
                     <span>
                       {selectedProfiles.length > 0
-                        ? `并行启动选中 (${selectedProfiles.length})`
-                        : `并行启动全部 (${profilesToDisplay.length}并联)`}
+                        ? `Parallel LaunchSelected (${selectedProfiles.length})`
+                        : `Parallel LaunchAll (${profilesToDisplay.length} parallel)`}
                     </span>
                     <span className="bg-white/25 px-1.5 py-0.5 rounded text-[10px] font-mono font-normal">
                       ⌘⏎

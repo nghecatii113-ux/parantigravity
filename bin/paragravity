@@ -196,11 +196,26 @@ def extract_account_info(profile_dir: Path) -> dict:
             tok_raw = token_file.read_text(encoding="utf-8").strip()
             if tok_raw:
                 info["has_token"] = True
-                claims = decode_jwt_payload(tok_raw)
-                if not info["email"] and claims.get("email"):
-                    info["email"] = claims["email"]
-                if claims.get("exp"):
-                    info["token_exp"] = datetime.fromtimestamp(claims["exp"]).isoformat()
+                if tok_raw.startswith("{"):
+                    try:
+                        tok_data = json.loads(tok_raw)
+                        if not info["email"]:
+                            info["email"] = tok_data.get("id_token_email") or tok_data.get("email")
+                        tok_obj = tok_data.get("token") or {}
+                        if tok_obj.get("expiry"):
+                            info["token_exp"] = str(tok_obj["expiry"])
+                        if not info["email"] and tok_obj.get("access_token"):
+                            claims = decode_jwt_payload(tok_obj["access_token"])
+                            if claims.get("email"):
+                                info["email"] = claims["email"]
+                    except Exception:
+                        pass
+                else:
+                    claims = decode_jwt_payload(tok_raw)
+                    if not info["email"] and claims.get("email"):
+                        info["email"] = claims["email"]
+                    if claims.get("exp"):
+                        info["token_exp"] = datetime.fromtimestamp(claims["exp"]).isoformat()
         except Exception:
             pass
 
@@ -885,6 +900,63 @@ def setup_profile_inheritance(
     harden_profile_perms(target_profile_dir, profiles_dir)
     return report
 
+def sync_conversation_history(target_profile_dir: Path, source: str = "host") -> dict:
+    """
+    Safely fork/copy conversation history, summaries, and brain directory
+    from host environment or another profile to the target profile.
+    Uses deep copy (never symlinks) to prevent SQLite concurrency locking.
+    """
+    profiles_dir = get_profiles_dir()
+    if source == "host":
+        src_gemini_ag = Path.home() / ".gemini" / "antigravity"
+    else:
+        src_gemini_ag = profiles_dir / source / "home" / ".gemini" / "antigravity"
+
+    if not src_gemini_ag.is_dir():
+        return {"synced": False, "reason": f"Source directory not found: {src_gemini_ag}"}
+
+    dst_gemini_ag = target_profile_dir / "home" / ".gemini" / "antigravity"
+    dst_gemini_ag.mkdir(parents=True, exist_ok=True)
+
+    copied = []
+    # 1. Copy conversation_summaries.db
+    src_db = src_gemini_ag / "conversation_summaries.db"
+    dst_db = dst_gemini_ag / "conversation_summaries.db"
+    if src_db.is_file():
+        try:
+            shutil.copy2(src_db, dst_db)
+            copied.append("conversation_summaries.db")
+        except Exception:
+            pass
+
+    # 2. Copy conversations/ folder
+    src_convs = src_gemini_ag / "conversations"
+    dst_convs = dst_gemini_ag / "conversations"
+    if src_convs.is_dir():
+        dst_convs.mkdir(exist_ok=True)
+        count = 0
+        for f in src_convs.glob("*.db"):
+            try:
+                shutil.copy2(f, dst_convs / f.name)
+                count += 1
+            except Exception:
+                pass
+        copied.append(f"conversations ({count} sessions)")
+
+    # 3. Copy brain/ folder (contains transcripts & artifacts)
+    src_brain = src_gemini_ag / "brain"
+    dst_brain = dst_gemini_ag / "brain"
+    if src_brain.is_dir():
+        try:
+            def ignore_locks(d, files):
+                return [f for f in files if f.endswith((".lock", ".wal", ".shm"))]
+            shutil.copytree(src_brain, dst_brain, dirs_exist_ok=True, ignore=ignore_locks)
+            copied.append("brain")
+        except Exception:
+            pass
+
+    return {"synced": True, "items": copied}
+
 def create_macos_app_shortcut(profile_name: str) -> Path:
     """Create a macOS native .app in ~/Applications so Spotlight and Dock can launch it."""
     if not IS_DARWIN:
@@ -1065,12 +1137,18 @@ def cmd_create(args):
             inherit_mcp=inherit_mcp
         )
 
+    sync_report = None
+    if getattr(args, "sync_conversations", False):
+        sync_src = inherited_source or "host"
+        sync_report = sync_conversation_history(profile_dir, source=sync_src)
+
     # Create profile metadata
     meta = {
         "name": name,
         "description": args.description or "",
         "symlink_policy": args.links,
         "inherited_from": inherited_source,
+        "sync_conversations": bool(getattr(args, "sync_conversations", False)),
         "created_at": datetime.now().isoformat(),
         "version": 1
     }
@@ -1091,6 +1169,9 @@ def cmd_create(args):
         items_str = ", ".join(sorted(set(items))) if items else "settings"
         print(f"  • Inherited:   {COLOR_CYAN}{source_label}{COLOR_RESET} ({items_str})")
         print(f"  • Security:    {COLOR_GREEN}Credentials & session tokens isolated (0700){COLOR_RESET}")
+    if sync_report and sync_report.get("synced"):
+        items_str = ", ".join(sync_report.get("items", []))
+        print(f"  • History:     {COLOR_CYAN}Synced conversation history & brain{COLOR_RESET} ({items_str})")
     if app_path:
         label = "macOS App:" if IS_DARWIN else "Shortcut:"
         search_hint = "Spotlight Cmd+Space" if IS_DARWIN else "Start Menu Win+S"
@@ -2030,6 +2111,8 @@ def main():
     p_create.add_argument("-l", "--launch", action="store_true", help="Launch immediately after creation")
     p_create.add_argument("-i", "--inherit-config", action="store_true",
                           help="Inherit user settings, keybindings, snippets, skills and MCP config from host environment (credentials/tokens are never copied)")
+    p_create.add_argument("-c", "--sync-conversations", action="store_true",
+                          help="Sync and copy conversation history, summaries, and brain context from host or source profile")
     p_create.add_argument("--clone-from", metavar="SOURCE_PROFILE",
                           help="Clone settings, keybindings, snippets and configs from an existing profile")
     p_create.add_argument("--no-mcp", action="store_true",
